@@ -21,11 +21,4 @@ This project is a client-side application for a PDF Retrieval-Augmented Generati
 2. Install dependencies.
 3. Start the client application.
 
-## Technologies
-
-- React (or your chosen frontend framework)
-- Integration with backend RAG services
-
-## License
-
 This project is licensed under the MIT License.
