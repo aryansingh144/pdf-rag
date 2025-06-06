@@ -8,7 +8,8 @@ const handleFileUploadButtonClick = () => {
     el.setAttribute('accept', 'application/pdf');
     el.addEventListener('change', (event) => {
         if(el.files && el.files.length > 0) {
-            const  file=el.files[0];
+            const  file =el.files[0];
+            
         }
     })
     el.click();
