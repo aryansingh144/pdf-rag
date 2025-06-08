@@ -4,6 +4,8 @@ import multer from 'multer';
 // import path from 'path';
 // import fs from 'fs';
 import { Queue } from "bullmq";
+import { VertexAIEmbeddings } from "@langchain/google-vertexai";
+import { QdrantVectorStore } from "@langchain/qdrant";
 
 const queue = new Queue("Queue-for-file-processing", {
     connection: {
@@ -12,6 +14,8 @@ const queue = new Queue("Queue-for-file-processing", {
     },
 });
 
+
+ 
 
 // const uploadDir = path.join(process.cwd(), 'uploads');
 // if (!fs.existsSync(uploadDir)) {
@@ -55,6 +59,27 @@ app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
   return res.json({ status: 'File uploaded successfully', file: req.file });
 }
 );
+
+app.get('/chat', async(req,res)=>{
+    const query="FORM GST CMP-03"
+    const embeddings = new VertexAIEmbeddings({
+          model: "gemini-embedding-001",
+          project: process.env.GCP_PROJECT_ID,
+          location: "us-central1",
+        });
+
+    const vectorStore = await QdrantVectorStore.fromExistingCollection(embeddings, {
+        url: process.env.QDRANT_URL,
+        collectionName: "langchainjs-testing",
+      });
+
+      const ret=vectorStore.asRetriever({
+        k:2,
+      });
+    const result=await ret.invoke(query);
+
+    return res.json({status: 'Chat response', data: result});
+})
 
 
 app.listen(8000 || process.env.PORT, () => {
