@@ -1,89 +1,89 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-// import path from 'path';
-// import fs from 'fs';
-import { Queue } from "bullmq";
-import { VertexAIEmbeddings } from "@langchain/google-vertexai";
-import { QdrantVectorStore } from "@langchain/qdrant";
+import { Queue } from 'bullmq';
+import { OpenAIEmbeddings } from '@langchain/openai';
+import { QdrantVectorStore } from '@langchain/qdrant';
+import OpenAI from 'openai';
 
-const queue = new Queue("Queue-for-file-processing", {
-    connection: {
-        host: 'localhost',
-        port: 6379
-    },
+const client = new OpenAI({
+  apiKey: '',
 });
-
-
- 
-
-// const uploadDir = path.join(process.cwd(), 'uploads');
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir);
-// }
+const queue = new Queue('file-upload-queue', {
+  connection: {
+    host: 'localhost',
+    port: '6379',
+  },
+});
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/')
+    cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
-    cb(null, `${uniqueSuffix}-${file.originalname}`)
-  }
-})
-
-const upload =multer({
-storage: storage
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  },
 });
+
+const upload = multer({ storage: storage });
 
 const app = express();
 app.use(cors());
 
-
-
 app.get('/', (req, res) => {
-  return res.json({status : 'All good!'});
-}
-);
+  return res.json({ status: 'All Good!' });
+});
 
 app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded'});
-  }
-  await queue.add("file-sent", JSON.stringify({
-    filename:req.file.originalname,
-    source:req.file.destination,
-    path:req.file.path,
-  }));
+  await queue.add(
+    'file-ready',
+    JSON.stringify({
+      filename: req.file.originalname,
+      destination: req.file.destination,
+      path: req.file.path,
+    })
+  );
+  return res.json({ message: 'uploaded' });
+});
 
-  return res.json({ status: 'File uploaded successfully', file: req.file });
-}
-);
+app.get('/chat', async (req, res) => {
+  const userQuery = req.query.message;
 
-app.get('/chat', async(req,res)=>{
-    const query="FORM GST CMP-03"
-    const embeddings = new VertexAIEmbeddings({
-          model: "gemini-embedding-001",
-          project: process.env.GCP_PROJECT_ID,
-          location: "us-central1",
-        });
+  const embeddings = new OpenAIEmbeddings({
+    model: 'text-embedding-3-small',
+    apiKey: '',
+  });
+  const vectorStore = await QdrantVectorStore.fromExistingCollection(
+    embeddings,
+    {
+      url: 'http://localhost:6333',
+      collectionName: 'langchainjs-testing',
+    }
+  );
+  const ret = vectorStore.asRetriever({
+    k: 2,
+  });
+  const result = await ret.invoke(userQuery);
 
-    const vectorStore = await QdrantVectorStore.fromExistingCollection(embeddings, {
-        url: process.env.QDRANT_URL,
-        collectionName: "langchainjs-testing",
-      });
+  const SYSTEM_PROMPT = `
+  You are helfull AI Assistant who answeres the user query based on the available context from PDF File.
+  Context:
+  ${JSON.stringify(result)}
+  `;
 
-      const ret=vectorStore.asRetriever({
-        k:2,
-      });
-    const result=await ret.invoke(query);
+  const chatResult = await client.chat.completions.create({
+    model: 'gpt-4.1',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userQuery },
+    ],
+  });
 
-    return res.json({status: 'Chat response', data: result});
-})
+  return res.json({
+    message: chatResult.choices[0].message.content,
+    docs: result,
+  });
+});
 
-
-app.listen(8000 || process.env.PORT, () => {
-  console.log(`Server is running on port: ${8000 || process.env.PORT}`);
-}
-);
-
+app.listen(8000, () => console.log(`Server started on PORT:${8000}`));
