@@ -1,0 +1,45 @@
+# Node backend
+node_modules/
+dist/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.*.local
+
+
+# Logs
+logs/
+*.log
+
+# Editor settings
+.vscode/
+.idea/
+*.swp
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# React frontend (if included in same repo)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.*.local
+
+# Docker
+**/*.pid
+*.pid
+docker-compose.override.yml
+
+# Vector DBs / RAG data
+chroma/
+pinecone_cache/
+input_data/
+output_data/
+tmp/
+.cache/
+*.sqlite3
+*.db
